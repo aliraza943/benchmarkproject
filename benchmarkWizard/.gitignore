@@ -1,34 +1,17 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# React / Node.js
+# React
 node_modules/
 dist/
-dist-ssr/
-*.local
-.env                 # React .env (if using)
+.env
 
-# Flask / Python backend
+# Python / Flask
 backend/__pycache__/
 backend/venv/
 backend/.env
-backend/*.pyc
-backend/instance/
+*.pyc
+*.log
 *.sqlite3
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea/
+# macOS & Editor junk
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+.vscode/
+.idea/
