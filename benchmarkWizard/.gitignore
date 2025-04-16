@@ -1,0 +1,34 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# React / Node.js
+node_modules/
+dist/
+dist-ssr/
+*.local
+.env                 # React .env (if using)
+
+# Flask / Python backend
+backend/__pycache__/
+backend/venv/
+backend/.env
+backend/*.pyc
+backend/instance/
+*.sqlite3
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
