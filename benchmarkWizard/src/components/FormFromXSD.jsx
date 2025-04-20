@@ -17,7 +17,7 @@ const PropertyXMLForm = () => {
     occupancyPercentage: '80',
     isFederalProperty: false,
   });
-  
+
   const [propertyId, setPropertyId] = useState(null); // State for storing propertyId
 
   useEffect(() => {
@@ -51,7 +51,7 @@ const PropertyXMLForm = () => {
   // Build XML string from formData and send as a POST request
   const handleSubmit = async (e) => {
     e.preventDefault();
-  
+
     const xmlData = `
   <property>
     <name>${formData.name}</name>
@@ -66,25 +66,25 @@ const PropertyXMLForm = () => {
     <isFederalProperty>${formData.isFederalProperty}</isFederalProperty>
   </property>
     `.trim();
-  
+
     try {
-      const response = await fetch('http://localhost:5000/submit-xml', {
+      const response = await fetch('http://127.0.0.1:5000/submit-xml', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/xml',
         },
         body: xmlData,
       });
-  
+
       const result = await response.json(); // response is already JSON
-  
+
       const propertyId = result.id; // grab the ID
       console.log('✅ Property ID:', propertyId);
       console.log('🌐 Location Header:', result.location);
       console.log('📝 Full Response:', result);
-  
+
       setPropertyId(propertyId); // Store the propertyId in state
-  
+
       alert(`Property submitted successfully! ID: ${propertyId}`);
     } catch (err) {
       console.error('❌ Error submitting XML:', err);

@@ -141,15 +141,15 @@ export default function PropertyUse({ id }) {
     const date = new Date().toISOString().split('T')[0];
     let xml = `<${fn}><name>${selectedValue}</name><useDetails>`;
     refDetails.forEach(({ name }) => {
-        const value = inputValues[name] || '';
-        const unitsAttr = name.includes('Floor') ? ' units="Square Feet"' : '';
-        xml += `<${name} currentAsOf="${date}" temporary="false"${unitsAttr}><value>${value}</value></${name}>`;
-      });
-      
+      const value = inputValues[name] || '';
+      const unitsAttr = name.includes('Floor') ? ' units="Square Feet"' : '';
+      xml += `<${name} currentAsOf="${date}" temporary="false"${unitsAttr}><value>${value}</value></${name}>`;
+    });
+
     xml += `</useDetails></${fn}>`;
-  
+
     try {
-      const res = await fetch(`http://localhost:5000/submit-propertyUse?id=${id}`, {
+      const res = await fetch(`http://127.0.0.1:5000/submit-propertyUse?id=${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/xml' },
         body: xml,
@@ -161,7 +161,7 @@ export default function PropertyUse({ id }) {
       setErrorMessage('Submission failed');
     }
   };
-  
+
 
   return (
     <form onSubmit={handleSubmit}>
