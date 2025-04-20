@@ -1,12 +1,11 @@
 # React
 node_modules/
 dist/
-.env
+
 
 # Python / Flask
 backend/__pycache__/
 backend/venv/
-backend/.env
 *.pyc
 *.log
 *.sqlite3
