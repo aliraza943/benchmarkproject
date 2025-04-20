@@ -1,9 +1,11 @@
-import React, { useState ,useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
+import PrimaryFunctionDropdown from '../components/OtherForm';
+import PropertyUse from '../components/PropertyUse'; // Import the dropdown component
 
 const PropertyXMLForm = () => {
   const [formData, setFormData] = useState({
     name: 'This is dummy',
-    primaryFunction: 'K-12 School',
+    primaryFunction: '',
     address1: 'idk what this address is',
     city: 'Edmonton',
     state: 'AB',
@@ -15,25 +17,27 @@ const PropertyXMLForm = () => {
     occupancyPercentage: '80',
     isFederalProperty: false,
   });
-  useEffect(() => {
-    const hash = window.location.hash
-    if (hash.includes('access_token')) {
-      const params = new URLSearchParams(hash.substring(1)) // remove '#' at start
-      const access_token = params.get('access_token')
-      const refresh_token = params.get('refresh_token')
-      const expires_in = params.get('expires_in')
-      const token_type = params.get('token_type')
+  
+  const [propertyId, setPropertyId] = useState(null); // State for storing propertyId
 
-      
-      localStorage.setItem('access_token', access_token)
-      localStorage.setItem('refresh_token', refresh_token)
-      localStorage.setItem('expires_in', expires_in)
-      localStorage.setItem('token_type', token_type)
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes('access_token')) {
+      const params = new URLSearchParams(hash.substring(1)); // remove '#' at start
+      const access_token = params.get('access_token');
+      const refresh_token = params.get('refresh_token');
+      const expires_in = params.get('expires_in');
+      const token_type = params.get('token_type');
+
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+      localStorage.setItem('expires_in', expires_in);
+      localStorage.setItem('token_type', token_type);
 
       // Clear hash from URL
-      window.history.replaceState(null, '', window.location.pathname)
+      window.history.replaceState(null, '', window.location.pathname);
     }
-  }, [])
+  }, []);
 
   // Update state for each input field
   const handleChange = (e) => {
@@ -47,37 +51,43 @@ const PropertyXMLForm = () => {
   // Build XML string from formData and send as a POST request
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // Construct the XML string using a template literal.
+  
     const xmlData = `
-<property>
-  <name>${formData.name}</name>
-  <primaryFunction>${formData.primaryFunction}</primaryFunction>
-  <address address1="${formData.address1}" city="${formData.city}" state="${formData.state}" postalCode="${formData.postalCode}" country="${formData.country}" />
-  <yearBuilt>${formData.yearBuilt}</yearBuilt>
-  <constructionStatus>${formData.constructionStatus}</constructionStatus>
-  <grossFloorArea temporary="false" units="Square Feet">
-    <value>${formData.grossFloorArea}</value>
-  </grossFloorArea>
-  <occupancyPercentage>${formData.occupancyPercentage}</occupancyPercentage>
-  <isFederalProperty>${formData.isFederalProperty}</isFederalProperty>
-</property>
+  <property>
+    <name>${formData.name}</name>
+    <primaryFunction>${formData.primaryFunction}</primaryFunction>
+    <address address1="${formData.address1}" city="${formData.city}" state="${formData.state}" postalCode="${formData.postalCode}" country="${formData.country}" />
+    <yearBuilt>${formData.yearBuilt}</yearBuilt>
+    <constructionStatus>${formData.constructionStatus}</constructionStatus>
+    <grossFloorArea temporary="false" units="Square Feet">
+      <value>${formData.grossFloorArea}</value>
+    </grossFloorArea>
+    <occupancyPercentage>${formData.occupancyPercentage}</occupancyPercentage>
+    <isFederalProperty>${formData.isFederalProperty}</isFederalProperty>
+  </property>
     `.trim();
-
+  
     try {
       const response = await fetch('http://localhost:5000/submit-xml', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/xml'
+          'Content-Type': 'application/xml',
         },
-        body: xmlData
+        body: xmlData,
       });
-
-      const result = await response.text();
-      console.log('Server response:', result);
-      alert('XML submitted successfully');
+  
+      const result = await response.json(); // response is already JSON
+  
+      const propertyId = result.id; // grab the ID
+      console.log('✅ Property ID:', propertyId);
+      console.log('🌐 Location Header:', result.location);
+      console.log('📝 Full Response:', result);
+  
+      setPropertyId(propertyId); // Store the propertyId in state
+  
+      alert(`Property submitted successfully! ID: ${propertyId}`);
     } catch (err) {
-      console.error('Error submitting XML:', err);
+      console.error('❌ Error submitting XML:', err);
       alert('Error submitting XML');
     }
   };
@@ -103,22 +113,16 @@ const PropertyXMLForm = () => {
         {/* Primary Function */}
         <div>
           <label htmlFor="primaryFunction" className="block font-medium text-gray-700">Primary Function:</label>
-          <input
-            type="text"
-            id="primaryFunction"
-            name="primaryFunction"
+          <PrimaryFunctionDropdown
             value={formData.primaryFunction}
             onChange={handleChange}
-            placeholder="e.g., K-12 School"
-            required
-            className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            name="primaryFunction"
           />
         </div>
 
         {/* Address Fieldset */}
         <fieldset className="border border-gray-300 rounded-md p-4">
           <legend className="text-lg font-semibold text-gray-700">Address</legend>
-          
           <div className="mt-3">
             <label htmlFor="address1" className="block text-gray-700">Address 1:</label>
             <input
@@ -264,10 +268,11 @@ const PropertyXMLForm = () => {
             type="submit"
             className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            Submit Property 
+            Submit Property
           </button>
         </div>
       </form>
+      {propertyId && <PropertyUse id={propertyId} />}
     </div>
   );
 };

@@ -1,28 +1,27 @@
 import { useEffect, useState } from 'react'
+import PrimaryFunctionDropdown from '../components/PropertyUse'
 
 const SubmitForm = () => {
   const [formData, setFormData] = useState({
     name: '',
     message: ''
   })
+  const [propertyId, setPropertyId] = useState(null)
 
-  // Store access token & user info from URL on first render
   useEffect(() => {
     const hash = window.location.hash
     if (hash.includes('access_token')) {
-      const params = new URLSearchParams(hash.substring(1)) // remove '#' at start
+      const params = new URLSearchParams(hash.substring(1))
       const access_token = params.get('access_token')
       const refresh_token = params.get('refresh_token')
       const expires_in = params.get('expires_in')
       const token_type = params.get('token_type')
 
-      // Optional: store entire token object
       localStorage.setItem('access_token', access_token)
       localStorage.setItem('refresh_token', refresh_token)
       localStorage.setItem('expires_in', expires_in)
       localStorage.setItem('token_type', token_type)
 
-      // Clear hash from URL
       window.history.replaceState(null, '', window.location.pathname)
     }
   }, [])
@@ -53,6 +52,8 @@ const SubmitForm = () => {
       const data = await response.json()
       if (response.ok) {
         alert(`✅ Submitted: ${data.message}`)
+        // Assume backend returns { id: "19503602", message: "success" }
+        setPropertyId(data.id)
       } else {
         alert(`❌ Error: ${data.error}`)
       }
@@ -87,6 +88,9 @@ const SubmitForm = () => {
           Submit
         </button>
       </form>
+
+      {/* Render dropdown only when propertyId is available */}
+      
     </div>
   )
 }
