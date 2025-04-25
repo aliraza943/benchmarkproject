@@ -1,4 +1,4 @@
-  useEffect(() => {
+useEffect(() => {
     fetch('/propertyUse/propertyUseList.xsd')
       .then(res => res.text())
       .then(data => {

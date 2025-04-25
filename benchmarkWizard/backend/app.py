@@ -11,7 +11,8 @@ import traceback  # Add this near your other imports
 
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
+
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -55,9 +56,18 @@ def submit_form():
         return jsonify({"error": str(e)}), 401
     
 
-@app.route('/submit-xml', methods=['POST'])
+@app.route('/submit-xml', methods=['POST', 'OPTIONS'])
 def submit_xml():
+    if request.method == 'OPTIONS':
+        # Handle preflight request (CORS)
+        response = Response()
+        response.headers['Access-Control-Allow-Origin'] = 'http://localhost:5173'  # Your React app's URL
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response
+
     try:
+        # Only execute the actual POST request if not a preflight (OPTIONS)
         xml_data = request.data.decode('utf-8')
         print("Sending XML to ENERGY STAR:\n", xml_data)
 
@@ -101,7 +111,7 @@ def submit_xml():
             "error": str(e),
             "trace": error_trace
         }), 500
-    
+
 @app.route('/submit-propertyUse', methods=['POST'])
 def submit_property_Use():
     try:

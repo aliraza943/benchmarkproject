@@ -189,7 +189,7 @@ export default function PropertyUse({ id }) {
   
     setSubmitResponse(results);
   };
-  
+
 
   return (
     <form onSubmit={handleSubmit}>
