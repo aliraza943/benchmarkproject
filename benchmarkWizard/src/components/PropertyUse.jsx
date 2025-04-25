@@ -2,29 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { XMLParser } from 'fast-xml-parser';
 
 export default function PropertyUse({ id }) {
-  const [options, setOptions] = useState([]);
-  const [selectedValue, setSelectedValue] = useState('');
-  const [refDetails, setRefDetails] = useState([]);
+  const [options] = useState([
+    'Swimming Pool',
+    'Ev Charging Station',
+    'Residential Care Facility',
+    'Restaurant',
+    'Retail',
+    'Parking',
+  ]);
+  
+  const [selectedValues, setSelectedValues] = useState([]);
+  const [refDetailsMap, setRefDetailsMap] = useState({});
   const [typeDefs, setTypeDefs] = useState({});
-  const [inputValues, setInputValues] = useState({});
+  const [inputValuesMap, setInputValuesMap] = useState({});
   const [errorMessage, setErrorMessage] = useState('');
   const [submitResponse, setSubmitResponse] = useState(null);
-
-
-  useEffect(() => {
-    fetch('/property.xsd')
-      .then(res => res.text())
-      .then(data => {
-        const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
-        const json = parser.parse(data);
-        const simpleTypes = json['xs:schema']['xs:simpleType'];
-        const primaryFunction = simpleTypes.find(t => t.name === 'primaryFunctionType');
-        const enums = primaryFunction['xs:restriction']['xs:enumeration'];
-        setOptions(enums.map(e => e.value));
-      })
-      .catch(console.error);
-  }, []);
-
 
   useEffect(() => {
     const loadTypes = async () => {
@@ -34,6 +26,7 @@ export default function PropertyUse({ id }) {
         const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
         const json = parser.parse(text);
         const defs = {};
+
         (json['xs:schema']['xs:simpleType'] || []).forEach(st => {
           const restr = st['xs:restriction'];
           if (restr && restr['xs:enumeration']) {
@@ -43,13 +36,12 @@ export default function PropertyUse({ id }) {
             defs[st.name] = { kind: 'enum', values: vals };
           }
         });
+
         (json['xs:schema']['xs:complexType'] || []).forEach(ct => {
           const name = ct.name;
           const seq = ct['xs:complexContent']?.['xs:extension']?.['xs:sequence'];
           if (!seq) return;
-          const elements = Array.isArray(seq['xs:element'])
-            ? seq['xs:element']
-            : [seq['xs:element']];
+          const elements = Array.isArray(seq['xs:element']) ? seq['xs:element'] : [seq['xs:element']];
           const valEl = elements.find(e => e.name === 'value');
           if (!valEl) return;
           const inlineEnum = valEl['xs:simpleType']?.['xs:restriction']?.['xs:enumeration'];
@@ -65,11 +57,13 @@ export default function PropertyUse({ id }) {
             else defs[name] = { kind: 'number' };
           }
         });
+
         setTypeDefs(defs);
       } catch (err) {
         console.error('Error loading type definitions:', err);
       }
     };
+
     loadTypes();
   }, []);
 
@@ -82,152 +76,203 @@ export default function PropertyUse({ id }) {
       .map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()))
       .join('');
 
-  const formatRefDoc = name => name.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase());
+  const formatRefDoc = name =>
+    name.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase());
 
-  const loadCharacteristics = async refs => {
+  const loadCharacteristics = async (refs) => {
     try {
       const res = await fetch('/propertyUse/characteristics.xsd');
       const text = await res.text();
       const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
       const json = parser.parse(text);
       const elements = json['xs:schema']['xs:element'] || [];
-      setRefDetails(refs.map(ref => {
+
+      return refs.map(ref => {
         const el = elements.find(e => e.name === ref);
         const type = el?.type || 'Unknown';
         const raw = el?.['xs:annotation']?.['xs:documentation']?.trim();
         const doc = raw || formatRefDoc(ref);
         return { name: ref, type, doc };
-      }));
+      });
     } catch (err) {
       console.error(err);
+      return [];
     }
   };
 
   const tryLoadXSD = async fileName => {
     try {
       const res = await fetch(`/propertyUse/${fileName}.xsd`);
-      if (!res.ok || !res.headers.get('content-type').includes('xml')) throw new Error();
+      if (!res.ok || !res.headers.get('content-type')?.includes('xml')) throw new Error();
       const text = await res.text();
       const match = text.match(/<xs:complexType>[\s\S]*?<\/xs:complexType>/);
       if (!match) throw new Error();
       const refs = [...match[0].matchAll(/ref="([^"]+)"/g)].map(m => m[1]);
-      await loadCharacteristics(refs);
-      return refs;
+      return await loadCharacteristics(refs);
     } catch {
       return null;
     }
   };
 
-  const handleChange = async e => {
-    const selected = e.target.value;
-    setSelectedValue(selected);
-    setErrorMessage('');
-    setInputValues({});
-    setRefDetails([]);
-    if (!selected) return;
-    const fn = formatFileName(selected);
-    const refs = await tryLoadXSD(fn) || await tryLoadXSD('otherPropertyUses');
-    if (!refs) setErrorMessage('Could not load properties.');
+  const handleToggleSelect = async label => {
+    const isSelected = selectedValues.includes(label);
+    const updated = isSelected
+      ? selectedValues.filter(l => l !== label)
+      : [...selectedValues, label];
+
+    setSelectedValues(updated);
+
+    if (!isSelected) {
+      const fn = formatFileName(label);
+      const details = await tryLoadXSD(fn) || await tryLoadXSD('otherPropertyUses');
+      if (!details) {
+        setErrorMessage(`Could not load details for ${label}`);
+        return;
+      }
+      setRefDetailsMap(prev => ({ ...prev, [fn]: details }));
+      setInputValuesMap(prev => ({ ...prev, [fn]: {} }));
+    }
   };
 
-  const onValueChange = (name, val) => {
-    setInputValues(prev => ({ ...prev, [name]: val }));
+  const handleInputChange = (fileKey, field, value) => {
+    setInputValuesMap(prev => ({
+      ...prev,
+      [fileKey]: { ...prev[fileKey], [field]: value }
+    }));
   };
 
-  // Build XML and submit to Flask endpoint
   const handleSubmit = async e => {
     e.preventDefault();
-    const fn = formatFileName(selectedValue);
     const date = new Date().toISOString().split('T')[0];
-    let xml = `<${fn}><name>${selectedValue}</name><useDetails>`;
-    refDetails.forEach(({ name }) => {
-        const value = inputValues[name] || '';
-        const unitsAttr = name.includes('Floor') ? ' units="Square Feet"' : '';
+    setErrorMessage('');
+    setSubmitResponse(null);
+  
+    const results = [];
+    // map your “file-friendly” names to the actual XSD root element names:
+    const rootTagMap = {
+      evChargingStation: 'electricVehicleChargingStation'
+      // add other mappings here if needed
+    };
+  
+    for (const label of selectedValues) {
+      const fn = formatFileName(label);               // e.g. "evChargingStation"
+      const rootTag = rootTagMap[fn] || fn;           // yields "electricVehicleChargingStation"
+      const details = refDetailsMap[fn];
+      const values = inputValuesMap[fn] || {};
+      if (!details) continue;
+  
+      // build XML with the correct root tag
+      let xml = `<${rootTag}><name>${label}</name><useDetails>`;
+      details.forEach(({ name }) => {
+        const value = values[name] || '';
+        let unitsAttr = '';
+        if (name.includes('Floor') || name.includes('Area')||  name.includes('area') || name.includes('Footage') ) unitsAttr = ' units="Square Feet"';
+        else if (name.includes('length') || name.includes('Height')) unitsAttr = ' units="Feet"';
         xml += `<${name} currentAsOf="${date}" temporary="false"${unitsAttr}><value>${value}</value></${name}>`;
       });
-      
-    xml += `</useDetails></${fn}>`;
+      xml += `</useDetails></${rootTag}>`;
   
-    try {
-      const res = await fetch(`http://localhost:5000/submit-propertyUse?id=${id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/xml' },
-        body: xml,
-      });
-      const result = await res.json();
-      setSubmitResponse(result);
-    } catch (err) {
-      console.error('Submission error', err);
-      setErrorMessage('Submission failed');
+      console.log('XML:', xml);
+  
+      try {
+        const res = await fetch(`http://localhost:5000/submit-propertyUse?id=${id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/xml' },
+          body: xml,
+        });
+        const result = await res.json();
+        results.push({ label, status: 'success', response: result });
+      } catch (err) {
+        results.push({ label, status: 'error', message: err.message });
+      }
     }
+  
+    setSubmitResponse(results);
   };
   
 
   return (
     <form onSubmit={handleSubmit}>
-      <label className="block font-medium text-gray-700">Property Use Details</label>
-      <select
-        className="mt-1 w-full p-2 border rounded"
-        value={selectedValue}
-        onChange={handleChange}
-        required
-      >
-        <option value="">Select one</option>
-        {options.map((o, i) => <option key={i} value={o}>{o}</option>)}
-      </select>
+      <label className="block font-medium text-gray-700 mb-2">Select Property Uses</label>
+      <div className="flex flex-wrap gap-2 mb-4">
+        {options.map(option => {
+          const selected = selectedValues.includes(option);
+          return (
+            <button
+              type="button"
+              key={option}
+              className={`px-3 py-1 rounded border ${selected ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
+              onClick={() => handleToggleSelect(option)}
+            >
+              My Property Has {option}
+            </button>
+          );
+        })}
+      </div>
 
-      {errorMessage && <p className="text-red-600 mt-2">{errorMessage}</p>}
-      {refDetails.map((item, i) => {
-        const def = typeDefs[item.type] || { kind: 'text' };
+      {errorMessage && <p className="text-red-600">{errorMessage}</p>}
+
+      {selectedValues.map(label => {
+        const fn = formatFileName(label);
+        const details = refDetailsMap[fn] || [];
+        const inputValues = inputValuesMap[fn] || {};
+
         return (
-          <div key={i} className="mt-4">
-            <label className="block font-semibold">{item.doc}</label>
-            {def.kind === 'enum' && (
-              <select
-                className="mt-1 w-full p-2 border rounded"
-                value={inputValues[item.name] || ''}
-                onChange={e => onValueChange(item.name, e.target.value)}
-                required
-              >
-                <option value="">Select {item.name}</option>
-                {def.values.map((v, idx) => <option key={idx} value={v}>{v}</option>)}
-              </select>
-            )}
-            {def.kind === 'number' && (
-              <input
-                type="number"
-                className="mt-1 w-full p-2 border rounded"
-                value={inputValues[item.name] || ''}
-                onChange={e => onValueChange(item.name, e.target.value)}
-                required
-              />
-            )}
-            {def.kind === 'text' && (
-              <input
-                type="text"
-                className="mt-1 w-full p-2 border rounded"
-                value={inputValues[item.name] || ''}
-                onChange={e => onValueChange(item.name, e.target.value)}
-                required
-              />
-            )}
+          <div key={label} className="mb-6">
+            <h3 className="text-lg font-semibold mb-2">{label}</h3>
+            {details.map((item, idx) => {
+              const def = typeDefs[item.type] || { kind: 'text' };
+              return (
+                <div key={idx} className="mb-3">
+                  <label className="block font-medium">{item.doc}</label>
+                  {def.kind === 'enum' ? (
+                    <select
+                      className="w-full p-2 border rounded"
+                      value={inputValues[item.name] || ''}
+                      onChange={e => handleInputChange(fn, item.name, e.target.value)}
+                      required
+                    >
+                      <option value="">Select {item.name}</option>
+                      {def.values.map((v, i) => (
+                        <option key={i} value={v}>{v}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type={def.kind === 'number' ? 'number' : 'text'}
+                      className="w-full p-2 border rounded"
+                      value={inputValues[item.name] || ''}
+                      onChange={e => handleInputChange(fn, item.name, e.target.value)}
+                      required
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         );
       })}
 
-      {refDetails.length > 0 && (
+      {selectedValues.length > 0 && (
         <button
           type="submit"
-          className="mt-6 px-4 py-2 bg-blue-600 text-white rounded"
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"
         >
           Submit
         </button>
       )}
 
       {submitResponse && (
-        <pre className="mt-4 p-2 bg-gray-100 rounded">
-          {JSON.stringify(submitResponse, null, 2)}
-        </pre>
+        <div className="mt-6">
+          <h4 className="font-bold text-lg">Submission Results:</h4>
+          <ul className="mt-2 list-disc pl-6">
+            {submitResponse.map((r, i) => (
+              <li key={i} className={r.status === 'success' ? 'text-green-600' : 'text-red-600'}>
+                {r.label}: {r.status === 'success' ? 'Submitted successfully' : `Failed - ${r.message}`}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </form>
   );
