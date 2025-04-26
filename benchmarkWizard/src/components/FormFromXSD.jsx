@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PrimaryFunctionDropdown from '../components/OtherForm';
-import PropertyUse from '../components/PropertyUse'; // Import the dropdown component
+import PropertyUse from '../components/newForm';
 
 const PropertyXMLForm = () => {
   const [formData, setFormData] = useState({
@@ -18,12 +18,14 @@ const PropertyXMLForm = () => {
     isFederalProperty: false,
   });
 
-  const [propertyId, setPropertyId] = useState(null); // State for storing propertyId
+  const [propertyId, setPropertyId] = useState(null);
+  const [submitDisabled, setSubmitDisabled] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false); // New state
 
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.includes('access_token')) {
-      const params = new URLSearchParams(hash.substring(1)); // remove '#' at start
+      const params = new URLSearchParams(hash.substring(1));
       const access_token = params.get('access_token');
       const refresh_token = params.get('refresh_token');
       const expires_in = params.get('expires_in');
@@ -34,12 +36,10 @@ const PropertyXMLForm = () => {
       localStorage.setItem('expires_in', expires_in);
       localStorage.setItem('token_type', token_type);
 
-      // Clear hash from URL
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, []);
 
-  // Update state for each input field
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData({
@@ -48,23 +48,23 @@ const PropertyXMLForm = () => {
     });
   };
 
-  // Build XML string from formData and send as a POST request
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitDisabled(true);
 
     const xmlData = `
-  <property>
-    <name>${formData.name}</name>
-    <primaryFunction>${formData.primaryFunction}</primaryFunction>
-    <address address1="${formData.address1}" city="${formData.city}" state="${formData.state}" postalCode="${formData.postalCode}" country="${formData.country}" />
-    <yearBuilt>${formData.yearBuilt}</yearBuilt>
-    <constructionStatus>${formData.constructionStatus}</constructionStatus>
-    <grossFloorArea temporary="false" units="Square Feet">
-      <value>${formData.grossFloorArea}</value>
-    </grossFloorArea>
-    <occupancyPercentage>${formData.occupancyPercentage}</occupancyPercentage>
-    <isFederalProperty>${formData.isFederalProperty}</isFederalProperty>
-  </property>
+      <property>
+        <name>${formData.name}</name>
+        <primaryFunction>${formData.primaryFunction}</primaryFunction>
+        <address address1="${formData.address1}" city="${formData.city}" state="${formData.state}" postalCode="${formData.postalCode}" country="${formData.country}" />
+        <yearBuilt>${formData.yearBuilt}</yearBuilt>
+        <constructionStatus>${formData.constructionStatus}</constructionStatus>
+        <grossFloorArea temporary="false" units="Square Feet">
+          <value>${formData.grossFloorArea}</value>
+        </grossFloorArea>
+        <occupancyPercentage>${formData.occupancyPercentage}</occupancyPercentage>
+        <isFederalProperty>${formData.isFederalProperty}</isFederalProperty>
+      </property>
     `.trim();
 
     try {
@@ -76,19 +76,20 @@ const PropertyXMLForm = () => {
         body: xmlData,
       });
 
-      const result = await response.json(); // response is already JSON
+      const result = await response.json();
+      const propertyId = result.id;
 
-      const propertyId = result.id; // grab the ID
       console.log('✅ Property ID:', propertyId);
       console.log('🌐 Location Header:', result.location);
       console.log('📝 Full Response:', result);
 
-      setPropertyId(propertyId); // Store the propertyId in state
-
+      setPropertyId(propertyId);
+      setIsSubmitted(true); // Mark as submitted
       alert(`Property submitted successfully! ID: ${propertyId}`);
     } catch (err) {
       console.error('❌ Error submitting XML:', err);
       alert('Error submitting XML');
+      setSubmitDisabled(false); // Re-enable button on failure
     }
   };
 
@@ -120,7 +121,7 @@ const PropertyXMLForm = () => {
           />
         </div>
 
-        {/* Address Fieldset */}
+        {/* Address */}
         <fieldset className="border border-gray-300 rounded-md p-4">
           <legend className="text-lg font-semibold text-gray-700">Address</legend>
           <div className="mt-3">
@@ -263,15 +264,21 @@ const PropertyXMLForm = () => {
           />
         </div>
 
+        {/* Submit Button */}
         <div className="text-center">
-          <button
-            type="submit"
-            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            Submit Property
-          </button>
+        <button
+  type="submit"
+  disabled={submitDisabled}
+  className={`mt-4 px-6 py-2 rounded-lg shadow focus:outline-none focus:ring-2 
+    ${submitDisabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} 
+    text-white`}
+>
+  {isSubmitted ? 'Submitted' : submitDisabled ? 'Submitting...' : 'Submit Property'}
+</button>
+
         </div>
       </form>
+
       {propertyId && <PropertyUse id={propertyId} />}
     </div>
   );

@@ -10,7 +10,7 @@ export default function PropertyUse({ id }) {
     'Retail',
     'Parking',
   ]);
-  
+
   const [selectedValues, setSelectedValues] = useState([]);
   const [refDetailsMap, setRefDetailsMap] = useState({});
   const [typeDefs, setTypeDefs] = useState({});
@@ -18,6 +18,7 @@ export default function PropertyUse({ id }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [submitResponse, setSubmitResponse] = useState(null);
 
+  // Load XSD type definitions
   useEffect(() => {
     const loadTypes = async () => {
       try {
@@ -27,6 +28,7 @@ export default function PropertyUse({ id }) {
         const json = parser.parse(text);
         const defs = {};
 
+        // simpleType enums
         (json['xs:schema']['xs:simpleType'] || []).forEach(st => {
           const restr = st['xs:restriction'];
           if (restr && restr['xs:enumeration']) {
@@ -37,6 +39,7 @@ export default function PropertyUse({ id }) {
           }
         });
 
+        // complexType inline or referenced
         (json['xs:schema']['xs:complexType'] || []).forEach(ct => {
           const name = ct.name;
           const seq = ct['xs:complexContent']?.['xs:extension']?.['xs:sequence'];
@@ -68,7 +71,8 @@ export default function PropertyUse({ id }) {
   }, []);
 
   const formatFileName = label =>
-    label.replace(/\(.*?\)/g, '')
+    label
+      .replace(/\(.*?\)/g, '')
       .replace(/&/g, 'and')
       .replace(/[^a-zA-Z0-9 ]/g, '')
       .trim()
@@ -79,7 +83,7 @@ export default function PropertyUse({ id }) {
   const formatRefDoc = name =>
     name.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase());
 
-  const loadCharacteristics = async (refs) => {
+  const loadCharacteristics = async refs => {
     try {
       const res = await fetch('/propertyUse/characteristics.xsd');
       const text = await res.text();
@@ -119,12 +123,11 @@ export default function PropertyUse({ id }) {
     const updated = isSelected
       ? selectedValues.filter(l => l !== label)
       : [...selectedValues, label];
-
     setSelectedValues(updated);
 
     if (!isSelected) {
       const fn = formatFileName(label);
-      const details = await tryLoadXSD(fn) || await tryLoadXSD('otherPropertyUses');
+      const details = (await tryLoadXSD(fn)) || (await tryLoadXSD('otherPropertyUses'));
       if (!details) {
         setErrorMessage(`Could not load details for ${label}`);
         return;
@@ -141,58 +144,64 @@ export default function PropertyUse({ id }) {
     }));
   };
 
-  const handleSubmit = async e => {
-    e.preventDefault();
-    const date = new Date().toISOString().split('T')[0];
+  // Now just an async function — no e.preventDefault needed
+  const handleSubmit = async () => {
     setErrorMessage('');
     setSubmitResponse(null);
-  
+
+    const date = new Date().toISOString().split('T')[0];
     const results = [];
-    // map your “file-friendly” names to the actual XSD root element names:
-    const rootTagMap = {
-      evChargingStation: 'electricVehicleChargingStation'
-      // add other mappings here if needed
-    };
-  
+    const rootTagMap = { evChargingStation: 'electricVehicleChargingStation' };
+
     for (const label of selectedValues) {
-      const fn = formatFileName(label);               // e.g. "evChargingStation"
-      const rootTag = rootTagMap[fn] || fn;           // yields "electricVehicleChargingStation"
+      const fn = formatFileName(label);
+      const rootTag = rootTagMap[fn] || fn;
       const details = refDetailsMap[fn];
       const values = inputValuesMap[fn] || {};
       if (!details) continue;
-  
-      // build XML with the correct root tag
+
       let xml = `<${rootTag}><name>${label}</name><useDetails>`;
       details.forEach(({ name }) => {
         const value = values[name] || '';
         let unitsAttr = '';
-        if (name.includes('Floor') || name.includes('Area')||  name.includes('area') || name.includes('Footage') ) unitsAttr = ' units="Square Feet"';
-        else if (name.includes('length') || name.includes('Height')) unitsAttr = ' units="Feet"';
+        if (/(Floor|Area|area|Footage)/.test(name)) unitsAttr = ' units="Square Feet"';
+        else if (/(length|Height)/.test(name)) unitsAttr = ' units="Feet"';
         xml += `<${name} currentAsOf="${date}" temporary="false"${unitsAttr}><value>${value}</value></${name}>`;
       });
       xml += `</useDetails></${rootTag}>`;
-  
-      console.log('XML:', xml);
-  
+
       try {
         const res = await fetch(`http://localhost:5000/submit-propertyUse?id=${id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/xml' },
           body: xml,
         });
-        const result = await res.json();
-        results.push({ label, status: 'success', response: result });
+        const contentType = res.headers.get('Content-Type') || '';
+        let responseData = {};
+        if (contentType.includes('application/json')) responseData = await res.json();
+        else responseData = { responseText: await res.text() };
+
+        if (res.ok) {
+          results.push({ label, status: 'success', statusCode: res.status, response: responseData });
+        } else {
+          results.push({
+            label,
+            status: 'error',
+            statusCode: res.status,
+            message: responseData.error || 'Something went wrong',
+            response: responseData
+          });
+        }
       } catch (err) {
-        results.push({ label, status: 'error', message: err.message });
+        results.push({ label, status: 'error', statusCode: null, message: err.message });
       }
     }
-  
+
     setSubmitResponse(results);
   };
 
-
   return (
-    <form onSubmit={handleSubmit}>
+    <div>
       <label className="block font-medium text-gray-700 mb-2">Select Property Uses</label>
       <div className="flex flex-wrap gap-2 mb-4">
         {options.map(option => {
@@ -255,7 +264,8 @@ export default function PropertyUse({ id }) {
 
       {selectedValues.length > 0 && (
         <button
-          type="submit"
+          type="button"
+          onClick={handleSubmit}
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"
         >
           Submit
@@ -274,6 +284,6 @@ export default function PropertyUse({ id }) {
           </ul>
         </div>
       )}
-    </form>
+    </div>
   );
 }
