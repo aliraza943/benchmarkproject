@@ -154,7 +154,7 @@ export default function PropertyUse({ id }) {
     refDetails.forEach(({ name }) => {
       const value = inputValues[name] || '';
       let unitsAttr = '';
-      if (name.includes('Floor') || name.includes('Area') || name.includes('area') || name.includes('Footage')) unitsAttr = ' units="Square Feet"';
+      if (name.includes('Floor')  || name.includes('area') || name.includes('Footage')) unitsAttr = ' units="Square Feet"';
       else if (name.includes('length') || name.includes('Height')) unitsAttr = ' units="Feet"';
       xml += `<${name} currentAsOf=\"${date}\" temporary=\"false\"${unitsAttr}><value>${value}</value></${name}>`;
     });
