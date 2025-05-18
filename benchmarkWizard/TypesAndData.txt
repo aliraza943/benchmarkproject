@@ -1,0 +1,19 @@
+... means optional
+
+gas_meter
+ Start Date END DATE USAGE PercentageRenewableGas.. COst.. Estimation..
+Elec_meter
+start DAte End Date Usage Cost... estimation.... Demand..... demand.... Cost.....
+
+Prop Meter
+
+Delivery date Quantity Cost.... Estimation......
+
+Solar MEter 
+
+StartDate Enddate UsedOnSite ExportedOffSite... Cost.... Estimation....
+
+
+
+Water Meter
+StartDate End Date Usage Cost Estimation

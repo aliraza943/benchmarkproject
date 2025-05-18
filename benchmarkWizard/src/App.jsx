@@ -4,6 +4,7 @@ import SubmitForm from './pages/SubmitForm'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import PropertyForm from './pages/PropertyForm'
+import UtilityForm from './components/UtilityForm'
 
 function App() {
   return (
@@ -14,7 +15,7 @@ function App() {
           <Route path="/" element={<Login />} />
           <Route path="/submit" element={<SubmitForm />} />
           <Route path="/addProperty" element={<PropertyForm />} />
-
+   <Route path="/utility" element={<UtilityForm />} />
         </Routes>
       </main>
       <Footer />
